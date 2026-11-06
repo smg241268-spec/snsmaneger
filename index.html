@@ -2,6 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-edJmLMd+LblpVZeMuv5qwU1d9r9E29gWvbQ/9pfDrL0='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>投稿管理｜note・SNS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -553,10 +556,30 @@ const SCHEDULE=[
   ["LinkedInへ1週間まとめを投稿","1週間の学び・実績・知見をまとめた長文をLinkedInに投稿する"]]},
  {d:"日",phase:"休み",tasks:[]}
 ];
-const NOW=new Date();
-const todayIdx=(NOW.getDay()+6)%7;
-const WS=(()=>{const d=new Date(NOW);d.setHours(0,0,0,0);d.setDate(d.getDate()-todayIdx);return d})();
-const weekKey=`${WS.getFullYear()}-${String(WS.getMonth()+1).padStart(2,"0")}-${String(WS.getDate()).padStart(2,"0")}`;
+/* 日付は開いている間も自動で更新する（日付が変わったら画面を描き直す） */
+let NOW, todayIdx, WS, weekKey;
+function setDate(n){
+  NOW=n; todayIdx=(NOW.getDay()+6)%7;
+  WS=new Date(NOW); WS.setHours(0,0,0,0); WS.setDate(WS.getDate()-todayIdx);
+  weekKey=`${WS.getFullYear()}-${String(WS.getMonth()+1).padStart(2,"0")}-${String(WS.getDate()).padStart(2,"0")}`;
+}
+/* 端末の時刻設定に左右されないよう、日本時間で今日を決める */
+const JST_FMT=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Tokyo",year:"numeric",month:"numeric",day:"numeric",hour:"numeric",minute:"numeric",hourCycle:"h23"});
+function jstNow(){
+  try{const o={};JST_FMT.formatToParts(new Date()).forEach(x=>o[x.type]=x.value);
+    return new Date(+o.year,+o.month-1,+o.day,+o.hour,+o.minute)}catch(_){return new Date()}
+}
+setDate(jstNow());
+function refreshDate(){
+  const n=jstNow();
+  if(n.toDateString()===NOW.toDateString()) return;
+  setDate(n);
+  for(const f of [()=>renderSched(),()=>renderX(),()=>renderSns(),()=>renderStats(),()=>renderReport(true)]){try{f()}catch(_){}}
+}
+setInterval(refreshDate,30000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshDate()});
+window.addEventListener("focus",refreshDate);
+window.addEventListener("pageshow",refreshDate);
 const totalTasks=SCHEDULE.reduce((a,s)=>a+s.tasks.length,0);
 let schedChecks={}, schedRef=null;
 const schedSaver=makeSaver(b=>schedRef.set(b),()=>toast("スケジュールを保存できませんでした"));
